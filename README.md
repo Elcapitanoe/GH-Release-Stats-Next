@@ -1,6 +1,6 @@
 # GitHub Release Analytics Next
 
-[Live Demo](https://elca.is-a.dev/gh-release-stats-next/)
+[Live Demo](https://elca.is-a.dev/GH-Release-Stats-Next/)
 
 A serverless, client-side dashboard for analyzing GitHub release metrics. This tool provides master-detail visualization of asset downloads, release velocity, and version adoption trends without backend infrastructure.
 
