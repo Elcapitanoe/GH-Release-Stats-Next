@@ -1,275 +1,741 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>GitHub Release Statistics</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced GitHub Release Analytics</title>
+    
+    <meta name="description" content="Professional grade GitHub release analytics. Visualize downloads, filter assets, and analyze version velocity.">
+    <meta property="og:title" content="GitHub Release Analytics Next">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        <meta name="title" content="Github Release Statistics" />
-        <meta name="description" content="Visualize your Github release total downloads as well as per asset downloads (ex. OS binary)." />
+    <style>
+        :root {
+            --bg-canvas: #0d1117;
+            --bg-surface: #161b22;
+            --bg-surface-hover: #21262d;
+            --border-subtle: #30363d;
+            --border-active: #8b949e;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --text-accent: #58a6ff;
+            --chart-line: #238636;
+            --chart-fill: rgba(35, 134, 54, 0.1);
+            --success: #238636;
+            --danger: #da3633;
+            --warning: #d29922;
+            --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
 
-        <!-- Open Graph / Facebook -->
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://ramiawar.github.io/gh-release-stats" />
-        <meta property="og:title" content="Github Release Statistics" />
-        <meta property="og:description" content="Visualize your Github release total downloads as well as per asset downloads (ex. OS binary)." />
-        <meta property="og:image" content="https://ramiawar.github.io/gh-release-stats/meta.png" />
+        [data-theme="light"] {
+            --bg-canvas: #ffffff;
+            --bg-surface: #f6f8fa;
+            --bg-surface-hover: #eaeef2;
+            --border-subtle: #d0d7de;
+            --border-active: #0969da;
+            --text-primary: #24292f;
+            --text-secondary: #57606a;
+            --text-accent: #0969da;
+            --chart-line: #1a7f37;
+            --chart-fill: rgba(26, 127, 55, 0.1);
+        }
 
-        <!-- Twitter -->
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content="https://ramiawar.github.io/gh-release-stats" />
-        <meta property="twitter:title" content="Github Release Statistics" />
-        <meta property="twitter:description" content="Visualize your Github release total downloads as well as per asset downloads (ex. OS binary)." />
-        <meta property="twitter:image" content="https://ramiawar.github.io/gh-release-stats/meta.png" />
+        * { box-sizing: border-box; outline: none; }
 
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100 min-h-screen py-2 px-2 sm:px-2 lg:px-2">
-        <div class="flex justify-end text-md mx-2 my-2 text-base font-semibold leading-7">
-            <a
-              href="https://github.com/RamiAwar/gh-release-stats"
-              class="flex group border rounded-xl w-fit p-1 border border-gray-300 hover:bg-gray-200 bg-white"
-            >
-              <div class="flex items-center">
-                <div class="flex h-10 items-center rounded-md font-medium px-2">
-                  ⭐️ us on GitHub
-                </div>
-              </div>
-            </a>
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .app-layout {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            min-height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .control-panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 20px;
+            display: grid;
+            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            align-items: end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0; 
+        }
+
+        .input-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        input[type="text"], input[type="password"] {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            width: 100%;
+        }
+
+        input:focus { border-color: var(--text-accent); box-shadow: 0 0 0 1px var(--text-accent); }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface-hover);
+            color: var(--text-primary);
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+            flex: 1;
+            text-align: center;
+        }
+
+        button.primary {
+            background: var(--success);
+            color: white;
+            border-color: rgba(255,255,255,0.1);
+        }
+
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease;
+        }
+
+        .dashboard.visible { opacity: 1; transform: translateY(0); }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-title { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+
+        .kpi-grid {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .kpi-box {
+            background: var(--bg-canvas);
+            border: 1px solid var(--border-subtle);
+            padding: 15px;
+            border-radius: 6px;
+        }
+        
+        .kpi-value { font-size: 24px; font-weight: 700; color: var(--text-primary); margin-top: 5px; }
+        .kpi-label { font-size: 12px; color: var(--text-secondary); }
+
+        .chart-container { position: relative; height: 300px; width: 100%; }
+
+        .table-wrapper {
+            grid-column: 1 / -1;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            max-height: 600px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        th {
+            background: var(--bg-surface-hover);
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th:hover { color: var(--text-primary); }
+
+        tr:hover { background: var(--bg-surface-hover); }
+
+        .tag-badge {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--text-accent);
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .status-bar {
+            grid-column: 1 / -1;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            display: none;
+        }
+        .status-error { background: rgba(218, 54, 51, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+        .status-info { background: rgba(88, 166, 255, 0.1); color: var(--text-accent); border: 1px solid var(--text-accent); }
+
+        .util-flex { display: flex; align-items: center; gap: 10px; }
+        .hidden { display: none !important; }
+
+        @media (max-width: 1024px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .app-layout { padding: 10px; gap: 15px; }
+            .control-panel { grid-template-columns: 1fr; gap: 12px; }
+            .actions { width: 100%; }
+            .kpi-grid { grid-template-columns: 1fr 1fr; }
+            .card-title { font-size: 13px; }
+            .kpi-value { font-size: 20px; }
+            
+            .table-wrapper { max-height: 70vh; }
+            th, td { padding: 10px 8px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-layout">
+    
+    <header class="control-panel">
+        <div class="input-group">
+            <label for="repo">Repository Target</label>
+            <input type="text" id="repo" placeholder="URL or User/Repo" autofocus>
         </div>
-        <div class="max-w-7xl mx-auto">
-            <h1 class="text-3xl font-bold text-center text-gray-900 mb-8">GitHub Release Tracker</h1>
-            <div class="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4 mb-6 justify-center">
-                <input
-                    type="text"
-                    id="repoInput"
-                    placeholder="ramiawar/dataline"
-                    class="flex-shrink px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                <button onclick="trackReleases()" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">Track Releases</button>
+        
+        <div class="input-group">
+            <label for="token">PAT (Optional)</label>
+            <input type="password" id="token" placeholder="github_pat_..." autocomplete="off">
+        </div>
+
+        <div class="input-group">
+            <label for="filter">Asset Exclusion (Regex)</label>
+            <input type="text" id="filter" value="\.(txt|md|sha256|asc|sig)$" placeholder="Regex to ignore files">
+        </div>
+
+        <div class="actions">
+            <button id="btnFetch" class="primary">Analyze</button>
+            <button id="btnClear" onclick="App.clearCache()">Clear Cache</button>
+            <button id="btnTheme" onclick="App.toggleTheme()">Theme</button>
+        </div>
+    </header>
+
+    <div id="statusMsg" class="status-bar"></div>
+
+    <main id="dashboard" class="dashboard">
+        
+        <div class="kpi-grid">
+            <div class="kpi-box">
+                <div class="kpi-label">Total Downloads</div>
+                <div class="kpi-value" id="kpiTotal">0</div>
             </div>
-            <div id="chartSection" class="mb-8 hidden flex flex-col">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">Asset Downloads for Latest Releases</h2>
-                <div class="p-4 max-h-96 max-w-7xl bg-white border border-gray-300 rounded-md">
-                    <button id="toggleLegendButton" class="text-sm p-1 px-2 m-1 bg-gray-100 border border-gray-300 rounded-md">Toggle Legend</button>
-                    <canvas id="releaseChart"></canvas>
-                </div>
+            <div class="kpi-box">
+                <div class="kpi-label">Total Releases</div>
+                <div class="kpi-value" id="kpiReleases">0</div>
             </div>
-            <div id="tableSection" class="hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-gray-900">Release Data</h2>
-                    <button onclick="exportToCSV()" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">Export to CSV</button>
-                </div>
-                <div class="overflow-x-auto overflow-y-scroll rounded-md border border-gray-300 max-h-96">
-                    <table id="releaseTable" class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Release Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Downloads</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Downloads</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200"></tbody>
-                    </table>
-                </div>
+            <div class="kpi-box">
+                <div class="kpi-label">Avg Downloads/Release</div>
+                <div class="kpi-value" id="kpiAvg">0</div>
+            </div>
+            <div class="kpi-box">
+                <div class="kpi-label">Latest Version</div>
+                <div class="kpi-value" style="color: var(--text-accent)" id="kpiLatest">-</div>
             </div>
         </div>
-    </div>
 
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMQ1D4BFNN"></script>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-EMQ1D4BFNN');
-    </script>
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <span class="card-title">Release Velocity</span>
+                <div class="util-flex">
+                    <button onclick="App.exportCSV()" style="font-size: 11px; padding: 4px 8px;">Export CSV</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
 
-    <script>
-        let chart;
-        let releaseData;
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title" id="detailTitle">Asset Distribution</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="detailChart"></canvas>
+            </div>
+        </div>
 
-        document.getElementById('repoInput').addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                trackReleases();
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">File Type Analysis</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="typeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="table-wrapper card" style="padding: 0;">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th onclick="App.sortTable('date')">Date ↕</th>
+                        <th onclick="App.sortTable('tag')">Version ↕</th>
+                        <th onclick="App.sortTable('asset')">Asset Name ↕</th>
+                        <th onclick="App.sortTable('size')">Size ↕</th>
+                        <th onclick="App.sortTable('downloads')">Downloads ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+    </main>
+
+    <footer style="text-align: center; font-size: 12px; color: var(--text-secondary); padding-top: 20px;">
+        <a href="https://github.com/Elcapitanoe/gh-release-stats-next" style="color: inherit; text-decoration: none;">GitHub: Elcapitanoe/gh-release-stats-next</a>
+    </footer>
+</div>
+
+<script>
+const App = (() => {
+    const state = {
+        data: [], 
+        releases: [],
+        charts: {},
+        repo: '',
+        sortCol: 'date',
+        sortAsc: false
+    };
+
+    const el = {
+        repo: document.getElementById('repo'),
+        token: document.getElementById('token'),
+        filter: document.getElementById('filter'),
+        btnFetch: document.getElementById('btnFetch'),
+        status: document.getElementById('statusMsg'),
+        dashboard: document.getElementById('dashboard'),
+        kpi: {
+            total: document.getElementById('kpiTotal'),
+            releases: document.getElementById('kpiReleases'),
+            avg: document.getElementById('kpiAvg'),
+            latest: document.getElementById('kpiLatest')
+        }
+    };
+
+    const init = () => {
+        if(localStorage.getItem('theme') === 'light') document.body.setAttribute('data-theme', 'light');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get('repo')) el.repo.value = urlParams.get('repo');
+        
+        el.btnFetch.addEventListener('click', fetchData);
+        el.repo.addEventListener('keypress', e => e.key === 'Enter' && fetchData());
+        
+        if(el.repo.value) fetchData();
+    };
+
+    const toggleTheme = () => {
+        const isLight = document.body.getAttribute('data-theme') === 'light';
+        document.body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+        localStorage.setItem('theme', isLight ? 'dark' : 'light');
+        updateChartsTheme();
+    };
+
+    const setStatus = (msg, type = 'info') => {
+        el.status.className = `status-bar status-${type}`;
+        el.status.innerText = msg;
+        el.status.style.display = msg ? 'block' : 'none';
+    };
+
+    const getHeaders = () => {
+        const h = { 'Accept': 'application/vnd.github.v3+json' };
+        if (el.token.value) h['Authorization'] = `token ${el.token.value}`;
+        return h;
+    };
+
+    const fetchData = async () => {
+        let repo = el.repo.value.trim();
+
+        try {
+            if (repo.includes('github.com')) {
+                const url = new URL(repo.startsWith('http') ? repo : `https://${repo}`);
+                const parts = url.pathname.split('/').filter(p => p);
+                if (parts.length >= 2) {
+                    repo = `${parts[0]}/${parts[1]}`.replace('.git', '');
+                    el.repo.value = repo; 
+                }
+            }
+        } catch (e) {
+        }
+
+        if (!repo.includes('/')) return setStatus('Invalid format. Use username/repo', 'error');
+
+        state.repo = repo;
+        el.btnFetch.disabled = true;
+        el.btnFetch.innerText = 'Processing...';
+        setStatus('');
+
+        try {
+            const cacheKey = `gh_stats_${repo}`;
+            const cached = localStorage.getItem(cacheKey);
+            const now = Date.now();
+            
+            let rawData;
+
+            if (cached) {
+                const c = JSON.parse(cached);
+                if (now - c.ts < 3600000) {
+                    rawData = c.data;
+                    setStatus('Loaded from local cache (1hr expiry)', 'info');
+                }
+            }
+
+            if (!rawData) {
+                const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers: getHeaders() });
+                
+                if (res.status === 403) throw new Error('API Rate Limit Exceeded. Provide a Token.');
+                if (res.status === 404) throw new Error('Repository not found.');
+                if (!res.ok) throw new Error('Network Error');
+
+                rawData = await res.json();
+                
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({ ts: now, data: rawData }));
+                } catch(e) { console.warn('Cache full'); }
+            }
+
+            processData(rawData);
+            renderDashboard();
+            
+            const url = new URL(window.location);
+            url.searchParams.set('repo', repo);
+            window.history.pushState({}, '', url);
+
+        } catch (err) {
+            setStatus(err.message, 'error');
+        } finally {
+            el.btnFetch.disabled = false;
+            el.btnFetch.innerText = 'Analyze';
+        }
+    };
+
+    const processData = (raw) => {
+        const filterRegex = new RegExp(el.filter.value || '$^');
+        
+        state.releases = [];
+        state.data = [];
+
+        const sortedRaw = raw.sort((a,b) => new Date(a.published_at) - new Date(b.published_at));
+
+        sortedRaw.forEach(rel => {
+            const relDate = rel.published_at.split('T')[0];
+            let relDownloads = 0;
+            const validAssets = [];
+
+            rel.assets.forEach(asset => {
+                if (filterRegex.test(asset.name)) return;
+
+                const assetData = {
+                    date: relDate,
+                    tag: rel.tag_name,
+                    asset: asset.name,
+                    size: asset.size,
+                    downloads: asset.download_count,
+                    type: asset.name.split('.').pop() || 'unknown'
+                };
+
+                state.data.push(assetData);
+                validAssets.push(assetData);
+                relDownloads += asset.download_count;
+            });
+
+            state.releases.push({
+                tag: rel.tag_name,
+                date: relDate,
+                total: relDownloads,
+                assets: validAssets
+            });
+        });
+    };
+
+    const renderDashboard = () => {
+        el.dashboard.classList.add('visible');
+        renderKPIs();
+        initCharts();
+        renderTable();
+    };
+
+    const renderKPIs = () => {
+        const total = state.data.reduce((acc, curr) => acc + curr.downloads, 0);
+        const relCount = state.releases.length;
+        
+        el.kpi.total.innerText = total.toLocaleString();
+        el.kpi.releases.innerText = relCount;
+        el.kpi.avg.innerText = relCount ? Math.floor(total / relCount).toLocaleString() : 0;
+        el.kpi.latest.innerText = state.releases.length ? state.releases[state.releases.length-1].tag : '-';
+    };
+
+    const getThemeColors = () => {
+        const isDark = document.body.getAttribute('data-theme') !== 'light';
+        return {
+            text: isDark ? '#8b949e' : '#57606a',
+            grid: isDark ? '#30363d' : '#d0d7de',
+            primary: isDark ? '#238636' : '#1a7f37',
+            bg: isDark ? '#0d1117' : '#ffffff'
+        };
+    };
+
+    const initCharts = () => {
+        const theme = getThemeColors();
+        
+        const ctxMain = document.getElementById('mainChart').getContext('2d');
+        if(state.charts.main) state.charts.main.destroy();
+
+        state.charts.main = new Chart(ctxMain, {
+            type: 'line',
+            data: {
+                labels: state.releases.map(r => r.tag),
+                datasets: [{
+                    label: 'Total Downloads',
+                    data: state.releases.map(r => r.total),
+                    borderColor: theme.primary,
+                    backgroundColor: theme.primary + '22',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e, elements) => {
+                    if(elements.length > 0) {
+                        const index = elements[0].index;
+                        updateDetailChart(state.releases[index]);
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: theme.text }, grid: { display: false } },
+                    y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
+                },
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { display: false }
+                }
             }
         });
 
-        async function fetchReleases(repo) {
-            const url = `https://api.github.com/repos/${repo}/releases`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch releases');
-            return await response.json();
+        if(state.releases.length > 0) {
+            updateDetailChart(state.releases[state.releases.length - 1]);
         }
 
-        function processReleaseData(releases) {
-            return releases.map(release => {
-                const totalDownloads = release.assets.reduce((sum, asset) => sum + asset.download_count, 0);
-                const releaseDate = new Date(release.published_at).toISOString().split('T')[0];
-                return {
-                    date: releaseDate,
-                    tagName: release.tag_name,
-                    releaseName: release.name || `Release ${release.tag_name}`,
-                    assets: release.assets.map(asset => ({
-                        name: asset.name,
-                        downloadCount: asset.download_count
-                    })),
-                    totalDownloads
-                };
-            });
-        }
+        renderTypeChart(theme);
+    };
 
-        function updateChart(data) {
-            const lastN = 6;
-            const releaseLabels = data.map(r => r.tagName).reverse().slice(-lastN);
-            const allAssetNames = [...new Set(data.flatMap(release => release.assets.map(asset => asset.name)))];
+    const updateDetailChart = (release) => {
+        document.getElementById('detailTitle').innerText = `Breakdown: ${release.tag} (${release.date})`;
+        const ctxDetail = document.getElementById('detailChart').getContext('2d');
+        const theme = getThemeColors();
 
-            const datasets = allAssetNames.map((assetName, index) => ({
-                label: assetName,
-                data: data.map(release => {
-                    const asset = release.assets.find(a => a.name === assetName);
-                    return asset ? asset.downloadCount : 0;
-                }).reverse().slice(-lastN),
-                borderColor: `hsl(${index * 137.508}deg, 70%, 50%)`,
-                fill: false
-            }));
+        const assets = [...release.assets].sort((a,b) => b.downloads - a.downloads);
 
-            datasets.unshift({
-                label: 'Total Downloads',
-                data: data.map(release => release.totalDownloads).reverse().slice(-lastN),
-                borderColor: 'rgb(75, 192, 192)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                fill: true,
-                borderWidth: 3,
-                pointRadius: 5,
-                pointHoverRadius: 7
-            });
+        if(state.charts.detail) state.charts.detail.destroy();
 
-            if (chart) chart.destroy();
+        state.charts.detail = new Chart(ctxDetail, {
+            type: 'bar',
+            data: {
+                labels: assets.map(a => a.asset.length > 20 ? a.asset.substring(0,17)+'...' : a.asset),
+                datasets: [{
+                    label: 'Downloads',
+                    data: assets.map(a => a.downloads),
+                    backgroundColor: '#58a6ff',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { color: theme.grid }, ticks: { color: theme.text } },
+                    y: { grid: { display: false }, ticks: { color: theme.text, autoSkip: false } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    };
 
-            const ctx = document.getElementById('releaseChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: { labels: releaseLabels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { 
-                        y: { 
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Downloads'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Release Tags'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false,
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: 'Asset Downloads per Release'
-                        }
-                    }
+    const renderTypeChart = (theme) => {
+        const typeMap = {};
+        state.data.forEach(d => {
+            typeMap[d.type] = (typeMap[d.type] || 0) + d.downloads;
+        });
+
+        const ctxType = document.getElementById('typeChart').getContext('2d');
+        if(state.charts.type) state.charts.type.destroy();
+
+        const types = Object.keys(typeMap);
+        const colors = types.map((_, i) => `hsl(${i * 360 / types.length}, 70%, 60%)`);
+
+        state.charts.type = new Chart(ctxType, {
+            type: 'doughnut',
+            data: {
+                labels: types,
+                datasets: [{
+                    data: Object.values(typeMap),
+                    backgroundColor: colors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: theme.text } }
+                }
+            }
+        });
+    };
+
+    const updateChartsTheme = () => {
+        if(state.charts.main) {
+            const theme = getThemeColors();
+            [state.charts.main, state.charts.detail, state.charts.type].forEach(c => {
+                if(c) {
+                    if(c.options.scales.x) c.options.scales.x.ticks.color = theme.text;
+                    if(c.options.scales.y) c.options.scales.y.ticks.color = theme.text;
+                    c.update();
                 }
             });
-
-            window.addEventListener('resize', function() {
-                chart.resize();
-            });
         }
+    };
 
-        document.getElementById('toggleLegendButton').addEventListener('click', function() {
-            if (chart) {
-                chart.options.plugins.legend.display = !chart.options.plugins.legend.display;
-                chart.update();
+    const sortTable = (col) => {
+        if(state.sortCol === col) state.sortAsc = !state.sortAsc;
+        state.sortCol = col;
+        renderTable();
+    };
+
+    const renderTable = () => {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+
+        const sorted = [...state.data].sort((a, b) => {
+            let valA = a[state.sortCol];
+            let valB = b[state.sortCol];
+            
+            if (state.sortCol === 'downloads' || state.sortCol === 'size') {
+                return state.sortAsc ? valA - valB : valB - valA;
             }
+            return state.sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
         });
 
-        function updateTable(data) {
-            const tableBody = document.querySelector('#releaseTable tbody');
-            tableBody.innerHTML = '';
-            data.forEach(release => {
-                release.assets.forEach(asset => {
-                    const row = tableBody.insertRow();
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${release.date}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${release.tagName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${release.releaseName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.name}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.downloadCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${release.totalDownloads}</td>
-                    `;
-                });
-            });
-        }
+        sorted.slice(0, 200).forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${row.date}</td>
+                <td><span class="tag-badge">${row.tag}</span></td>
+                <td title="${row.asset}">${row.asset.length > 40 ? row.asset.substring(0,37)+'...' : row.asset}</td>
+                <td>${(row.size / 1024 / 1024).toFixed(2)} MB</td>
+                <td>${row.downloads.toLocaleString()}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
 
-        async function trackReleases() {
-            const repo = document.getElementById('repoInput').value;
-            if (!repo) {
-                alert('Please enter a repository in the format username/repository');
-                return;
-            }
+    const clearCache = () => {
+        Object.keys(localStorage).forEach(key => {
+            if(key.startsWith('gh_stats_')) localStorage.removeItem(key);
+        });
+        setStatus('Cache cleared', 'info');
+    };
 
-            try {
-                const releases = await fetchReleases(repo);
-                releaseData = processReleaseData(releases);
-                updateChart(releaseData);
-                updateTable(releaseData);
-                
-                // Show the chart and table sections
-                document.getElementById('chartSection').classList.remove('hidden');
-                document.getElementById('tableSection').classList.remove('hidden');
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to fetch release data. Check the console for details.');
-            }
-        }
+    const exportCSV = () => {
+        if(!state.data.length) return;
+        const headers = ['Date', 'Tag', 'Asset', 'Type', 'Size(Bytes)', 'Downloads'];
+        const csv = [
+            headers.join(','),
+            ...state.data.map(d => [d.date, d.tag, d.asset, d.type, d.size, d.downloads].join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${state.repo.replace('/','-')}-stats.csv`;
+        a.click();
+    };
 
-        function exportToCSV() {
-            if (!releaseData) {
-                alert('No data to export. Please fetch release data first.');
-                return;
-            }
+    return { init, toggleTheme, clearCache, sortTable, exportCSV };
+})();
 
-            const csvContent = [
-                ['Release Date', 'Tag', 'Name', 'Asset', 'Downloads', 'Total Downloads'],
-                ...releaseData.flatMap(release => 
-                    release.assets.map(asset => [
-                        release.date,
-                        release.tagName,
-                        release.releaseName,
-                        asset.name,
-                        asset.downloadCount,
-                        release.totalDownloads
-                    ])
-                )
-            ].map(row => row.join(',')).join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", "release_data.csv");
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        }
-    </script>
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
 </body>
 </html>
